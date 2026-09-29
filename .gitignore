@@ -1,0 +1,10 @@
+# Executáveis compilados
+sequencial
+paralelo
+
+# Arquivos de objetos
+*.o
+
+# Imagens de saída temporárias / testes
+data/saida_*.ppm
+data/*_saida.ppm
