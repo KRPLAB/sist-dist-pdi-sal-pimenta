@@ -19,7 +19,7 @@ struct imagem_ppm *ler_ppm(const char *caminho) {
 	}
 
 	char formato[3];
-	if (!(fscanf(fp, "%2s", formato)) || !(strcmp(formato, "P6"))) {
+	if (!(fscanf(fp, "%2s", formato)) || strcmp(formato, "P6") != 0) {
 		fprintf(stderr, "Formato invalido (deve ser P6): %s\n", caminho);
 		fclose(fp);
 		return NULL;
