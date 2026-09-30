@@ -8,24 +8,41 @@ Este repositório contém a implementação prática de um algoritmo de filtrage
 
 ---
 
+### Conjunto de Dados de Teste
+
+Como os arquivos de imagem de alta resolução possuem tamanho elevado para versionamento direto via Git, a tabela a seguir lista as fontes originais e dimensões das imagens utilizadas nos testes:
+
+| Tamanho | Dimensões | Nome do Arquivo Local | Fonte Original / Descrição |
+| :--- | :--- | :--- | :--- |
+| **Pequena** | $512 \times 512$ | `entrada_pequena.ppm` | [Kaggle - Salt and Pepper Noise Dataset](https://www.kaggle.com/datasets/rajneesh231/salt-and-pepper-noise-images?select=Noisy_folder) (`noisy_10961455225_0786d3edd2_c.jpg`) |
+| **Média** | $3648 \times 3648$ | `entrada_media.ppm` | [Wikimedia Commons - Bahkauv](https://commons.wikimedia.org/wiki/File:Bahkauv.jpg) |
+| **Grande** | $7854 \times 11498$ | `entrada_grande.ppm` | [Wikimedia Commons - Mona Lisa (C2RMF)](https://commons.wikimedia.org/wiki/File:Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF.jpg) |
+| **Extra Grande** | $30000 \times 21059$ | `entrada_grande_extra.ppm` | [Wikimedia Commons - The Last Day of Pompeii (Google Art Project)](https://commons.wikimedia.org/wiki/File:Karl_Brullov_-_The_Last_Day_of_Pompeii_-_Google_Art_Project.jpg) |
+
+---
+
 ### Estrutura de Pastas do Projeto
 
 ```text
 .
-├── data/               # Arquivos de imagem de teste (.ppm formato P6)
+├── data/                  # Imagens convertidas para o formato binário PPM (P6)
 │   ├── entrada_pequena.ppm
 │   ├── entrada_media.ppm
-│   └── entrada_grande.ppm
-├── src/                # Código-fonte em C
-│   ├── sequencial.c    # Algoritmo de filtragem sequencial
-│   └── paralelo.c      # Algoritmo paralelizado com OpenMP
-├── run_tests.sh        # Script Bash automatizado para coleta de tempos
-├── referencias.bib     # Arquivo de citações BibTeX para o relatório
-├── relatorio.tex       # Código-fonte do relatório em LaTeX
-├── relatorio.pdf       # Relatório final compilado exigido para entrega
-└── README.md           # Este arquivo de instruções
-```
+│   ├── entrada_grande.ppm
+│   ├── entrada_grande_extra.ppm
+│   └── originais/         # Arquivos originais (.jpg / .png)
+├── include/
+│   └── ppm.h              # Cabeçalho com estruturas de dados e protótipos de funções
+├── src/
+│   ├── sequencial.c       # Algoritmo de filtragem sequencial
+│   └── paralelo.c         # Algoritmo paralelizado com OpenMP
+├── generate_noisy_ppm.py  # Script em Python para síntese de ruído e conversão PPM P6
+├── run_tests.sh           # Script em Bash para automação dos testes de benchmark
+├── referencias.bib        # Referências bibliográficas BibTeX
+├── relatorio.tex          # Relatório técnico em LaTeX
+└── README.md
 
+```
 ---
 
 ### Requisitos de Compilação e Execução
