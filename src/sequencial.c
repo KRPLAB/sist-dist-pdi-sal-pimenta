@@ -1,16 +1,50 @@
+#include "../include/ppm.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Estrutura para armazenar a imagem na memória
-struct imagem_ppm {
-	int largura;
-	int altura;
-	int max_cor;
-	unsigned char *dados; // Array contendo os bytes R, G, B em sequência
-};
+// Função auxiliar para trocar dois valores de unsigned char
+static void trocar(unsigned char *a, unsigned char *b) {
+	unsigned char temp = *a;
+	*a = *b;
+	*b = temp;
+}
 
-// Função para ler arquivo PPM no formato P6
+// Ordenação simples por seleção (Selection Sort) para 9 elementos
+static void ordenar_janela(unsigned char vetor[9]) {
+	for (int i = 0; i < 8; i++) {
+		int min_idx = i;
+		for (int j = i + 1; j < 9; j++) {
+			if (vetor[j] < vetor[min_idx]) {
+				min_idx = j;
+			}
+		}
+		if (min_idx != i) {
+			trocar(&vetor[i], &vetor[min_idx]);
+		}
+	}
+}
+
+// Aloca memória para uma nova imagem com as mesmas dimensões
+struct imagem_ppm *criar_imagem_ppm(int largura, int altura, int max_cor) {
+	struct imagem_ppm *img = malloc(sizeof(struct imagem_ppm));
+	if (!img)
+		return NULL;
+
+	img->largura = largura;
+	img->altura = altura;
+	img->max_cor = max_cor;
+
+	size_t tamanho_dados = (size_t)largura * altura * 3;
+	img->dados = malloc(tamanho_dados);
+	if (!img->dados) {
+		free(img);
+		return NULL;
+	}
+
+	return img;
+}
+
 struct imagem_ppm *ler_ppm(const char *caminho) {
 	FILE *fp = fopen(caminho, "rb");
 	if (!fp) {
@@ -25,7 +59,6 @@ struct imagem_ppm *ler_ppm(const char *caminho) {
 		return NULL;
 	}
 
-	// Ignorar comentarios iniciados por '#'
 	int c = fgetc(fp);
 	while (c == '#' || c == '\n' || c == '\r' || c == ' ') {
 		if (c == '#') {
@@ -35,10 +68,13 @@ struct imagem_ppm *ler_ppm(const char *caminho) {
 			c = fgetc(fp);
 		}
 	}
-
 	ungetc(c, fp);
 
 	struct imagem_ppm *img = malloc(sizeof(struct imagem_ppm));
+	if (!img) {
+		fclose(fp);
+		return NULL;
+	}
 
 	if (fscanf(fp, "%d %d %d", &img->largura, &img->altura, &img->max_cor) !=
 	    3) {
@@ -47,10 +83,10 @@ struct imagem_ppm *ler_ppm(const char *caminho) {
 		free(img);
 		return NULL;
 	}
-	fgetc(fp); // Consumir o caractere de nova linha apos o cabecalho
+	fgetc(fp); // Consumir o \n do cabeçalho
 
 	size_t tamanho_dados = (size_t)img->largura * img->altura * 3;
-	img->dados = (unsigned char *)malloc(tamanho_dados);
+	img->dados = malloc(tamanho_dados);
 
 	size_t lidos = fread(img->dados, 1, tamanho_dados, fp);
 	if (lidos != tamanho_dados) {
@@ -61,7 +97,6 @@ struct imagem_ppm *ler_ppm(const char *caminho) {
 	return img;
 }
 
-// Função para escrever arquivo PPM no formato P6
 int salvar_ppm(const char *caminho, const struct imagem_ppm *img) {
 	FILE *fp = fopen(caminho, "wb");
 	if (!fp) {
@@ -69,10 +104,7 @@ int salvar_ppm(const char *caminho, const struct imagem_ppm *img) {
 		return 0;
 	}
 
-	// Escreve o cabeçalho P6
 	fprintf(fp, "P6\n%d %d\n%d\n", img->largura, img->altura, img->max_cor);
-
-	// Escreve os dados binarios dos pixels
 	size_t tamanho_dados = (size_t)img->largura * img->altura * 3;
 	fwrite(img->dados, 1, tamanho_dados, fp);
 
@@ -80,13 +112,53 @@ int salvar_ppm(const char *caminho, const struct imagem_ppm *img) {
 	return 1;
 }
 
-// Libera a memória alocada para a imagem
 void liberar_ppm(struct imagem_ppm *img) {
 	if (img) {
 		if (img->dados)
 			free(img->dados);
 		free(img);
 	}
+}
+
+// Aplica o filtro da mediana 3x3 na imagem de entrada
+struct imagem_ppm *aplicar_filtro_mediana_3x3(const struct imagem_ppm *img_in) {
+	int larg = img_in->largura;
+	int alt = img_in->altura;
+
+	struct imagem_ppm *img_out = criar_imagem_ppm(larg, alt, img_in->max_cor);
+	if (!img_out)
+		return NULL;
+
+	// Copiar pixels da borda (linhas e colunas extremas) sem alterar
+	memcpy(img_out->dados, img_in->dados, (size_t)larg * alt * 3);
+
+	// Percorrer pixels internos (ignorando borda de 1 pixel)
+	for (int y = 1; y < alt - 1; y++) {
+		for (int x = 1; x < larg - 1; x++) {
+
+			// Filtro para cada canal de cor (0=R, 1=G, 2=B)
+			for (int canal = 0; canal < 3; canal++) {
+				unsigned char janela[9];
+				int idx = 0;
+
+				// Coletar a vizinhança 3x3
+				for (int dy = -1; dy <= 1; dy++) {
+					for (int dx = -1; dx <= 1; dx++) {
+						int px = x + dx;
+						int py = y + dy;
+						janela[idx++] =
+						    img_in->dados[(py * larg + px) * 3 + canal];
+					}
+				}
+
+				// Ordenar e extrair a mediana (elemento do meio: índice 4)
+				ordenar_janela(janela);
+				img_out->dados[(y * larg + x) * 3 + canal] = janela[4];
+			}
+		}
+	}
+
+	return img_out;
 }
 
 int main(int argc, char *argv[]) {
@@ -99,33 +171,25 @@ int main(int argc, char *argv[]) {
 	const char *arquivo_saida = argv[2];
 
 	printf("Lendo imagem: %s...\n", arquivo_entrada);
-	struct imagem_ppm *img = ler_ppm(arquivo_entrada);
-	if (!img)
+	struct imagem_ppm *img_in = ler_ppm(arquivo_entrada);
+	if (!img_in)
 		return 1;
 
-	printf("Imagem lida com sucesso: %dx%d pixels, cor max: %d\n", img->largura,
-	       img->altura, img->max_cor);
+	printf("Imagem lida (%dx%d). Aplicando Filtro da Mediana 3x3...\n",
+	       img_in->largura, img_in->altura);
 
-	// Teste simples de manipulacao: converter para tons de cinza
-	for (int i = 0; i < img->largura * img->altura; i++) {
-		unsigned char r = img->dados[i * 3 + 0];
-		unsigned char g = img->dados[i * 3 + 1];
-		unsigned char b = img->dados[i * 3 + 2];
-
-		// Média ponderada para tom de cinza (luminância)
-		unsigned char cinza =
-		    (unsigned char)(0.299 * r + 0.587 * g + 0.114 * b);
-
-		img->dados[i * 3 + 0] = cinza;
-		img->dados[i * 3 + 1] = cinza;
-		img->dados[i * 3 + 2] = cinza;
+	struct imagem_ppm *img_out = aplicar_filtro_mediana_3x3(img_in);
+	if (!img_out) {
+		liberar_ppm(img_in);
+		return 1;
 	}
 
-	printf("Salvando imagem modificada em: %s...\n", arquivo_saida);
-	if (salvar_ppm(arquivo_saida, img)) {
-		printf("Processamento concluido com sucesso!\n");
+	printf("Salvando resultado em: %s...\n", arquivo_saida);
+	if (salvar_ppm(arquivo_saida, img_out)) {
+		printf("Filtro aplicado com sucesso!\n");
 	}
 
-	liberar_ppm(img);
+	liberar_ppm(img_in);
+	liberar_ppm(img_out);
 	return 0;
 }
