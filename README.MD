@@ -3,7 +3,9 @@
 
 Este repositório contém a implementação prática de um algoritmo de filtragem espacial para remoção de ruído do tipo **Sal e Pimenta (Impulse Noise)** em imagens digitais. O projeto contempla uma versão puramente sequencial e uma versão paralelizada utilizando a biblioteca **OpenMP** para arquiteturas de memória compartilhada.
 
-### Integrantes do Grupo
+O filtro implementado é o **filtro da mediana com janela 5×5**, aplicado independentemente a cada canal de cor (R, G, B). As bordas da imagem (duas linhas e duas colunas externas) são preservadas inalteradas.
+
+### Integrante
 * **Kauan da Rosa Paulino** - 20251pin10020017@estudantes.ifpr.edu.br / 20251pin10020017
 
 ---
@@ -19,18 +21,21 @@ Como os arquivos de imagem de alta resolução possuem tamanho elevado para vers
 | **Grande** | $7854 \times 11498$ | `entrada_grande.ppm` | [Wikimedia Commons - Mona Lisa (C2RMF)](https://commons.wikimedia.org/wiki/File:Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF.jpg) |
 | **Extra Grande** | $30000 \times 21059$ | `entrada_grande_extra.ppm` | [Wikimedia Commons - The Last Day of Pompeii (Google Art Project)](https://commons.wikimedia.org/wiki/File:Karl_Brullov_-_The_Last_Day_of_Pompeii_-_Google_Art_Project.jpg) |
 
+Todas as imagens foram convertidas para o formato binário **PPM P6** e receberam ruído sintético do tipo sal e pimenta por meio do script `generate_noisy_ppm.py` (exceto a de tamanho pequeno, que já foi obtida com ruído).
+
 ---
 
 ### Estrutura de Pastas do Projeto
 
 ```text
 .
-├── data/                  # Imagens convertidas para o formato binário PPM (P6)
+├── data/                  # Imagens convertidas para o formato binário PPM (P6), não versionados no Git por serem muito grandes
 │   ├── entrada_pequena.ppm
 │   ├── entrada_media.ppm
 │   ├── entrada_grande.ppm
 │   ├── entrada_grande_extra.ppm
-│   └── originais/         # Arquivos originais (.jpg / .png)
+│   ├── logs/              # Logs de benchmark (gerados por run_tests.sh)
+│   └── originais/         # Arquivos originais (.jpg / .png), não versionados no Git por serem muito grandes
 ├── include/
 │   └── ppm.h              # Cabeçalho com estruturas de dados e protótipos de funções
 ├── src/
@@ -41,8 +46,10 @@ Como os arquivos de imagem de alta resolução possuem tamanho elevado para vers
 ├── referencias.bib        # Referências bibliográficas BibTeX
 ├── relatorio.tex          # Relatório técnico em LaTeX
 └── README.md
-
 ```
+
+Por conta do tamanho elevado das imagens de entrada, elas não foram versionadas no Git. Para reproduzir os testes, é necessário baixar os arquivos originais e convertê-los para o formato PPM P6 com o script `generate_noisy_ppm.py`.
+
 ---
 
 ### Requisitos de Compilação e Execução
@@ -51,28 +58,71 @@ O projeto foi desenvolvido em ambiente Linux e requer o compilador `gcc` com sup
 
 #### 1. Compilar a versão Sequencial
 ```bash
-gcc -O3 src/sequencial.c -o sequencial
+gcc -std=c11 -Wall -Wextra -O3 -fopenmp src/sequencial.c -o sequencial  
 ```
+*Nota: a versão sequencial também é compilada com `-fopenmp` neste projeto, pois utiliza `omp_get_wtime()` para medição de tempo. O uso de OpenMP limita-se à instrumentação, sem paralelismo efetivo.*
+
 
 #### 2. Compilar a versão Paralela (com OpenMP)
 ```bash
-gcc -O3 -fopenmp src/paraleo.c -o paralelo
+gcc -std=c11 -Wall -Wextra -O3 -fopenmp src/paralelo.c -o paralelo
 ```
-*Nota: A flag `-O3` ativa otimizações agressivas de laço pelo compilador, garantindo um cenário de benchmark real.*
+*Nota: `-O3` é obrigatório nas duas versões para uma comparação justa. Compilar o sequencial sem otimização e o paralelo com `-O3` infla artificialmente o speedup.*
 
 #### 3. Execução Manual
-Para rodar os programas individualmente, passe os parâmetros de arquivo e tamanho da janela k × k (ex: janela 3x3):
+
+Ambos os programas aceitam dois argumentos posicionais: **arquivo de entrada** e **arquivo de saída**, ambos em formato PPM P6.
+
 ```bash
-./sequencial data/entrada_media.ppm data/saida_sequencial.ppm 3
-./paralelo data/entrada_media.ppm data/saida_paralela.ppm 3
+./sequencial data/entrada_media.ppm data/saida_sequencial.ppm
+./paralelo  data/entrada_media.ppm data/saida_paralela.ppm
+```
+
+O tamanho da janela do filtro está fixado em **5×5** por decisão de projeto (ver relatório técnico). A região cronometrada pelo programa corresponde exclusivamente ao laço de filtragem; leitura, alocação e escrita de arquivo são excluídas das medições.
+
+**Controle do número de threads (versão paralela):** utilize a variável de ambiente `OMP_NUM_THREADS`. Isso permite reutilizar o mesmo binário para toda a bateria de testes.
+
+```bash
+OMP_NUM_THREADS=4 ./paralelo data/entrada_grande.ppm data/saida_4t.ppm
+OMP_NUM_THREADS=8 ./paralelo data/entrada_grande.ppm data/saida_8t.ppm
 ```
 
 #### 4. Execução Automática dos Testes
-Para rodar a bateria de testes de desempenho (5 execuções por configuração para gerar as médias de 1, 2, 4 e 8 threads), basta dar permissão e rodar o script automatizado:
+
+Para rodar a bateria completa de benchmark (5 execuções por configuração), execute o script:
+
 ```bash
 chmod +x run_tests.sh
 ./run_tests.sh
 ```
+
+O script gera logs em `data/logs/` com os tempos internos (medidos por `omp_get_wtime()`) e os tempos totais reportados por `/usr/bin/time`.
+
+**Recomendações antes da bateria:**
+
+```bash
+# Fixar governor da CPU em performance (evita throttling adaptativo)
+echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+```
+
+*Reverter ao padrão após os testes:*
+```bash
+echo schedutil | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+```
+
+---
+
+### Métricas de Desempenho
+
+As métricas reportadas no relatório foram calculadas a partir de:
+
+- **$T_s$**: tempo médio do filtro sequencial (5 execuções).
+- **$T_p(p)$**: tempo médio do filtro paralelo com $p$ threads (5 execuções).
+- **$S(p) = T_s / T_p(p)$**: *speedup*.
+- **$E(p) = S(p) / p$**: eficiência.
+- **$T_o(p) = T_p(p) \cdot p - T_s$**: *overhead*.
+
+A fração sequencial efetiva foi estimada pela diferença entre o tempo total do programa (`time` do Linux) e o tempo do laço de filtragem (`omp_get_wtime()`), sendo utilizada como parâmetro $\beta$ na Lei de Amdahl.
 
 ---
 
@@ -145,5 +195,4 @@ As referências abaixo foram integradas ao arquivo `referencias.bib` e mapeadas 
   howpublished = {\url{https://www.kaggle.com/datasets/rajneesh231/salt-and-pepper-noise-images}},
   note         = {Acessado em: 29 de setembro de 2026}
 }
-
 ```
