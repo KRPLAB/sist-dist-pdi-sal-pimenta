@@ -1,8 +1,8 @@
 #include "../include/ppm.h"
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <omp.h>
 
 // Função auxiliar para trocar dois valores de unsigned char
 static void trocar(unsigned char *a, unsigned char *b) {
@@ -131,31 +131,30 @@ struct imagem_ppm *aplicar_filtro_mediana_5x5(const struct imagem_ppm *img_in,
 	if (!img_out)
 		return NULL;
 
-	// Copiar pixels da borda (duas linhas e colunas extremas) sem alterar
+	// 1. Cópia completa para preservar as bordas
 	memcpy(img_out->dados, img_in->dados, (size_t)larg * alt * 3);
 
 	double inicio = omp_get_wtime();
 
-	// Percorrer pixels internos (ignorando borda de 2 pixels)
+	// Diretiva OpenMP aplicada ao laço mais externo
+	#pragma omp parallel for schedule(static) default(none) \
+		shared(img_in, img_out, larg, alt)
 	for (int y = 2; y < alt - 2; y++) {
 		for (int x = 2; x < larg - 2; x++) {
 
-			// Filtro para cada canal de cor (0=R, 1=G, 2=B)
 			for (int canal = 0; canal < 3; canal++) {
 				unsigned char janela[25];
 				int idx = 0;
 
-				// Coletar a vizinhança 5x5
 				for (int dy = -2; dy <= 2; dy++) {
 					for (int dx = -2; dx <= 2; dx++) {
 						int px = x + dx;
 						int py = y + dy;
 						janela[idx++] =
-						    img_in->dados[(py * larg + px) * 3 + canal];
+							img_in->dados[(py * larg + px) * 3 + canal];
 					}
 				}
 
-				// Ordenar e extrair a mediana (elemento do meio: índice 4)
 				ordenar_janela(janela, 25);
 				img_out->dados[(y * larg + x) * 3 + canal] = janela[12];
 			}
@@ -184,6 +183,12 @@ int main(int argc, char *argv[]) {
 
 	printf("Imagem lida (%dx%d). Aplicando Filtro da Mediana 5x5...\n",
 	       img_in->largura, img_in->altura);
+
+	#pragma omp parallel
+	{
+		#pragma omp master
+		printf("Threads efetivas: %d\n", omp_get_num_threads());
+	}
 
 	double tempo_filtro = 0.0;
 	struct imagem_ppm *img_out =
