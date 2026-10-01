@@ -48,8 +48,22 @@ Todas as imagens foram convertidas para o formato binário **PPM P6** e recebera
 └── README.md
 ```
 
-Por conta do tamanho elevado das imagens de entrada, elas não foram versionadas no Git. Para reproduzir os testes, é necessário baixar os arquivos originais e convertê-los para o formato PPM P6 com o script `generate_noisy_ppm.py`.
+### Reproduzindo os Testes
 
+As imagens de entrada (`.ppm`) **não estão versionadas** neste repositório por excederem 3 GB no total. Para reproduzir os experimentos:
+
+1. Baixe os arquivos originais a partir dos links da tabela acima.
+2. Coloque-os em `data/originais/`.
+3. Rode o script de conversão, que aplica ruído sal e pimenta sintético e
+   converte para PPM P6:
+   ```bash
+   python3 generate_noisy_ppm.py
+   ```
+4. Os arquivos `data/entrada_*.ppm` serão gerados.
+5. Compile os binários (seção anterior) e rode:
+   ```bash
+   ./run_tests.sh
+   ```
 ---
 
 ### Requisitos de Compilação e Execução
